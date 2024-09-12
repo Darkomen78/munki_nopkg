@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>_metadata</key>
+	<dict>
+		<key>created_by</key>
+		<string>slagraviere</string>
+		<key>creation_date</key>
+		<date>2020-12-01T17:10:19Z</date>
+		<key>munki_version</key>
+		<string>2.5.1.2627</string>
+		<key>os_version</key>
+		<string>10.11.3</string>
+	</dict>
+	<key>autoremove</key>
+	<false/>
+	<key>catalogs</key>
+	<array>
+		<string>base</string>
+	</array>
+	<key>category</key>
+	<string>IT</string>
+	<key>description</key>
+	<string>Change net.inet.tcp.delay settings to speed up SMB.</string>
+	<key>developer</key>
+	<string>SLG</string>
+	<key>display_name</key>
+	<string>SMB Ack Delay</string>
+	<key>installcheck_script</key>
+	<string>#!/bin/bash
+
+LIVECMD="sysctl"
+LIVECMDW="${LIVECMD} -w"
+CFGCMD="grep"
+CFGPATH="/etc/sysctl.conf"
+LOOKUPKEY="net.inet.tcp.delayed_ack"
+EXPECTEDVALUE="2"
+
+##### CHECK  #####
+
+LIVEALREADYSET=$(${LIVECMD} ${LOOKUPKEY} | grep "${EXPECTEDVALUE}" | wc -l | bc)
+[ -f ${CFGPATH} ] &amp;&amp; CFGALREADYSET=$(${CFGCMD} ${LOOKUPKEY} ${CFGPATH} | grep "${EXPECTEDVALUE}" | wc -l | bc) || CFGALREADYSET=0
+
+if [[ ${LIVEALREADYSET} == 1 &amp;&amp; ${CFGALREADYSET} == 1 ]];then
+	echo "Everything good, exit."
+	exit 1
+fi 
+
+if [[ ${LIVEALREADYSET} == 0 || ${CFGALREADYSET} == 0 ]]; then
+	echo "Start configuration."
+	exit 0
+fi</string>
+	<key>installer_type</key>
+	<string>nopkg</string>
+	<key>minimum_os_version</key>
+	<string>10.11.6</string>
+	<key>name</key>
+	<string>smb_ack_delay</string>
+	<key>postinstall_script</key>
+	<string>#!/bin/bash
+
+LIVECMD="sysctl"
+LIVECMDW="${LIVECMD} -w"
+CFGCMD="grep"
+CFGPATH="/etc/sysctl.conf"
+LOOKUPKEY="net.inet.tcp.delayed_ack"
+EXPECTEDVALUE="2"
+
+##### CONFIGURE #####
+
+# Get CURRENTCFGVALUE if CFGPATH file exist
+[ -f ${CFGPATH} ] &amp;&amp; CURRENTCFGVALUE=$(${CFGCMD} ${LOOKUPKEY} ${CFGPATH} | cut -d"=" -f2 | bc) 
+
+# Get CURRENTLIVEVALUE
+CURRENTLIVEVALUE=$(${LIVECMD} "${LOOKUPKEY}" | cut -d" " -f2 | bc)
+
+# If CURRENTLIVEVALUE is set to anything different from EXPECTEDVALUE, set CURRENTLIVEVALUE to EXPECTEDVALUE
+[[ "${CURRENTLIVEVALUE}" != "${EXPECTEDVALUE}" ]] &amp;&amp; ${LIVECMDW} ${LOOKUPKEY}=${EXPECTEDVALUE}
+
+# If CURRENTCGVALUE is not set, add it to CFGPATH or create CFGPATH file
+if [[ -z "${CURRENTCFGVALUE}" ]]; then
+	if [ -f "${CFGPATH}" ]; then
+		echo "Add ${LOOKUPKEY} in ${CFGPATH} and set to ${EXPECTEDVALUE} "
+		cp "${CFGPATH}" "${CFGPATH}"_"$(date +%d-%m-%Y)"
+		echo "${LOOKUPKEY}=${EXPECTEDVALUE}" &gt;&gt; "${CFGPATH}"
+		exit 0
+	else
+		echo "Create file $CFGPATH and set ${LOOKUPKEY} to ${EXPECTEDVALUE}"
+		echo "${LOOKUPKEY}=${EXPECTEDVALUE}" &gt; "${CFGPATH}"	
+		exit 0
+	fi
+else
+	# If CURRENTCGVALUE is set to anything different from EXPECTEDVALUE, set CURRENTCFGVALUE to EXPECTEDVALUE
+	if [[ "${CURRENTCFGVALUE}" != "${EXPECTEDVALUE}" ]]; then
+		sed -i "_$(date +%d-%m-%Y)" "s/${LOOKUPKEY}.*/${LOOKUPKEY}=${EXPECTEDVALUE}/" "${CFGPATH}"
+		echo "Set ${LOOKUPKEY} from ${CURRENTCFGVALUE} to ${EXPECTEDVALUE} in ${CFGPATH}"
+		exit 0
+	fi
+fi
+exit 0</string>
+	<key>unattended_install</key>
+	<true/>
+	<key>version</key>
+	<string>1.0</string>
+</dict>
+</plist>
